@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mortgage Rate API</title>
+    <style>
+        code {background-color:#ddd;padding:2px 5px;border-radius:2px;}
+    </style>
+</head>
+<body>
+    <h1>Mortgage Rate API</h1>
+
+    <h2>Test Form</h2>
+    <form id="rateForm">
+        <label for="date">Date:</label>
+        <input type="date" id="date" required><br>
+        <label for="term">Term:</label>
+        <select id="term" required>
+            <option value="30">30 years</option>
+            <option value="15">15 years</option>
+        </select><br>
+        <button type="submit">Get mortgage rate</button>
+    </form>
+    <br>
+    <div id="result"></div>
+    <br>
+
+    <h2>API Instructions</h2>
+    <ol>
+        <li>
+            <h3>Get an API Token</h3>
+            <p>Make a POST request to <code>/get_token</code> to receive your API token.</p>
+            <code>curl -X POST http://localhost:5000/get_token</code>
+        </li>
+        <li>
+            <h3>Use the API</h3>
+            <p>Make a GET request to <code>/mortgage_rate</code> with the following parameters:</p>
+            <ul>
+                <li><code>date</code>: Date in YYYYMMDD format</li>
+                <li><code>term</code>: 15 or 30 (years)</li>
+                <li><code>token</code>: Your API token</li>
+            </ul>
+            <p>Example:</p>
+            <code>curl "http://localhost:5000/mortgage_rate?date=20220101&term=30&token=your_api_token_here"</code>
+        </li>
+        <li>
+            <h3>Revoke Your Token</h3>
+            <p>Make a POST request to <code>/revoke_token</code> with your token as a parameter to revoke it.</p>
+            <code>curl -X POST "http://localhost:5000/revoke_token?token=your_api_token_here"</code>
+        </li>
+    </ol>
+
+    <script>
+        document.getElementById('rateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const date = document.getElementById('date').value;
+            const term = document.getElementById('term').value;
+            const formattedDate = date.replace(/-/g, '');
+
+            try {
+                // First, get a token
+                const tokenResponse = await fetch('/get_token', { method: 'POST' });
+                const tokenData = await tokenResponse.json();
+                const token = tokenData.token;
+
+                // Then, use the token to get the mortgage rate
+                const rateResponse = await fetch(`/mortgage_rate?date=${formattedDate}&term=${term}&token=${token}`);
+                const rateData = await rateResponse.json();
+
+                if (rateResponse.ok) {
+                    document.getElementById('result').textContent = `Mortgage rate for ${rateData.date} (${rateData.term}-year term): ${rateData.rate}%`;
+                } else {
+                    document.getElementById('result').textContent = `Error: ${rateData.error}`;
+                }
+
+                // Optionally, revoke the token after use
+                await fetch(`/revoke_token?token=${token}`, { method: 'POST' });
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
