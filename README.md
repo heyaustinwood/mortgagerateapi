@@ -1,106 +1,48 @@
 # Mortgage Rate API
 
-This Flask application provides an API to retrieve historical mortgage rates for 15-year and 30-year terms.
+Weekly US mortgage rates (30-year and 15-year fixed) for any date range, as JSON.
+Paid by subscription through Stripe. Runs at **mortgagerateapi.com**.
 
-## Setup Instructions
+- **Data:** Freddie Mac PMMS, pulled from FRED (`MORTGAGE30US`, `MORTGAGE15US`), back to 1971. Free and needs no key.
+- **API:** `GET /v1/rates?term=30&start=2024-01-01&end=2024-12-31` and `GET /v1/rates/latest`, with `Authorization: Bearer <key>`.
+- **Billing:** one Stripe subscription. Checkout issues the key; the Stripe portal handles card changes and cancellation; a webhook switches the key off when a subscription ends.
 
-### Prerequisites
+The whole app is one small Flask package:
 
-- Python 3.7+
-- pip (Python package installer)
+| File | What it does |
+| --- | --- |
+| `app/api.py` | The two `/v1` endpoints and key checks |
+| `app/billing.py` | `/subscribe`, `/welcome`, `/billing`, `/stripe/webhook` |
+| `app/rates.py` | Pulls rates from FRED (`flask sync-rates`, or in the background) |
+| `app/pages.py`, `app/templates/` | The one-page docs and pricing site |
 
-### Installation
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/your-username/mortgage-rate-api.git
-   cd mortgage-rate-api
-   ```
-
-2. Create a virtual environment:
-   ```
-   python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-   - On Windows:
-     ```
-     venv\Scripts\activate
-     ```
-   - On macOS and Linux:
-     ```
-     source venv/bin/activate
-     ```
-
-4. Install the required packages:
-   ```
-   pip install -r requirements.txt
-   ```
-
-5. Create a `.env` file in the project root and add the following:
-   ```
-   FLASK_APP=run.py
-   FLASK_ENV=development
-   SECRET_KEY=your_secret_key_here
-   ```
-   Replace `your_secret_key_here` with a strong, randomly generated string.
-
-### Database Setup
-
-1. Initialize the database:
-   ```
-   flask db init
-   flask db migrate -m "Initial migration"
-   flask db upgrade
-   ```
-
-2. Load the mortgage rate data:
-   ```
-   flask load-data
-   ```
-
-### Running the Application
-
-To run the application:
+## Run it locally
 
 ```
-flask run
+python -m venv venv && source venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env          # fill in Stripe test keys
+flask --app run sync-rates    # load ~4,700 weekly rates
+flask --app run run           # http://127.0.0.1:5000
+pytest
 ```
 
-The API will be available at `http://127.0.0.1:5000/`.
+To test checkout end to end locally, forward webhooks with the Stripe CLI:
+`stripe listen --forward-to localhost:5000/stripe/webhook` and put the `whsec_...` it prints in `.env`.
 
-## API Usage
+## Launch checklist
 
-### Get Token
+1. **Stripe.** Create a product with a recurring price (e.g. $19/month) and copy its `price_...` ID.
+   In *Settings → Billing → Customer portal*, turn on "cancel subscription" and "update payment method".
+   Add a webhook endpoint at `https://mortgagerateapi.com/stripe/webhook` for
+   `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`; copy its signing secret.
+2. **Host.** Any Docker host works (Render, Railway, Fly.io). Deploy this repo with the `Dockerfile` and set:
+   `BASE_URL=https://mortgagerateapi.com`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `PRICE_LABEL`, `SUPPORT_EMAIL`.
+   **Keys live in the database, so it must persist:** either attach a volume at `/app/instance` (SQLite)
+   or set `DATABASE_URL` to a Postgres database. Health check path: `/healthz`.
+3. **Domain.** Add `mortgagerateapi.com` (and `www`) as a custom domain on the host, then point DNS at it
+   with the records the host gives you. The host issues the HTTPS certificate.
+4. **Smoke test** with Stripe test keys first: subscribe with card `4242 4242 4242 4242`, call the API with the key
+   you get, cancel in the billing portal, and check the key now returns `402`. Then swap in live keys.
 
-To use the API, you first need to obtain a token:
-
-```
-curl -X POST http://127.0.0.1:5000/get_token
-```
-
-### Get Mortgage Rate
-
-Use the token to request mortgage rates:
-
-```
-curl "http://127.0.0.1:5000/mortgage_rate?date=20220101&term=30&token=your_token_here"
-```
-
-Replace `20220101` with your desired date (format: YYYYMMDD), `30` with either 15 or 30 for the mortgage term, and `your_token_here` with the token you received.
-
-### Revoke Token
-
-To revoke a token:
-
-```
-curl -X POST "http://127.0.0.1:5000/revoke_token?token=your_token_here"
-```
-
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+The container pulls fresh rates on start and every 6 hours (`SYNC_IN_BACKGROUND=1`). Freddie Mac publishes on Thursdays.

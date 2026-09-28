@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Mortgage Rate API{% endblock %}</title>
+<meta name="description" content="A small JSON API for weekly US mortgage rates (30-year and 15-year fixed) over any date range, back to 1971.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236ea8fe'/><text x='16' y='22' font-size='17' font-family='monospace' font-weight='700' text-anchor='middle' fill='%2306121f'>%25</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Lora:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #6ea8fe; --on-accent: #06121f; --accent-ink: #1d5fd0;
+    --bg: #fdfdfd; --surface: #ffffff; --surface-2: #f6f7f8;
+    --ink: #0a0a0a; --ink-2: #525252; --ink-3: #9a9a9a; --ink-4: #b0b0b0; --ink-nav: #3a3a3a;
+    --line: #ececee; --input-border: #e0e2e6;
+    --serif: 'Lora', Georgia, serif;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent-ink: #8ab8ff;
+      --bg: #000000; --surface: #0a0a0a; --surface-2: #141416;
+      --ink: #f0f0f0; --ink-2: #969696; --ink-3: #6a6a6a; --ink-4: #5a5a5a; --ink-nav: #c8c8c8;
+      --line: #1d1d1f; --input-border: #333338;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--ink);
+  }
+  a { color: inherit; text-decoration: none; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px 80px; }
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0 18px; border-bottom: 1px solid var(--line); margin-bottom: 44px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; }
+  .brand i {
+    width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: var(--on-accent);
+    font: 700 13px/22px var(--mono); font-style: normal; text-align: center;
+  }
+  .navlinks { display: flex; gap: 18px; font-size: 14px; }
+  .navlinks a { color: var(--ink-nav); }
+  .navlinks a:hover { color: var(--ink); }
+  .navlinks a.go { font-weight: 700; color: var(--accent-ink); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px;
+  }
+  .title { font-family: var(--serif); font-weight: 600; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 0 0 6px; }
+  .updated { font-size: 13.5px; color: var(--ink-3); margin: 0 0 40px; }
+
+  .body { font-size: 15.5px; line-height: 1.7; color: var(--ink-2); }
+  .body h2 { font-family: var(--serif); font-weight: 600; font-size: 22px; color: var(--ink); margin: 38px 0 10px; }
+  .body h3 { font-size: 16.5px; font-weight: 700; color: var(--ink); margin: 26px 0 8px; }
+  .body p { margin: 0 0 14px; }
+  .body ul { margin: 0 0 14px; padding-left: 22px; }
+  .body li { margin-bottom: 7px; }
+  .body a { color: var(--accent-ink); font-weight: 600; }
+  .body a:hover { text-decoration: underline; }
+  .body strong { color: var(--ink); font-weight: 700; }
+  .body li code, .note code { white-space: normal; overflow-wrap: anywhere; }
+  .body code {
+    font-family: var(--mono); font-size: 13px; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--ink); white-space: nowrap;
+  }
+  .note { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; font-size: 14px; margin: 0 0 14px; }
+  .code {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 0 0 16px;
+    overflow-x: auto; white-space: pre; color: var(--ink-2);
+  }
+  .code code { background: none; border: 0; padding: 0; font-size: inherit; white-space: pre; color: inherit; }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-4); font-weight: 700; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .big { font-family: var(--mono); font-size: 20px; color: var(--ink); }
+
+  .cta {
+    background: var(--accent); border-radius: 20px; padding: 34px 28px; margin-top: 52px;
+    text-align: center; color: var(--on-accent);
+  }
+  .cta h2 { font-family: var(--serif); font-weight: 600; font-size: clamp(22px, 3.5vw, 30px); margin: 0; }
+  .cta p { font-size: 15px; margin: 10px auto 0; max-width: 46ch; opacity: .85; }
+  .cta button {
+    margin-top: 20px; padding: 13px 26px; border: 0; border-radius: 12px; cursor: pointer;
+    background: #0a0a0a; color: #fdfdfd; font: 800 15px 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .cta button:hover { filter: brightness(1.35); }
+  .cta small { display: block; margin-top: 12px; font-size: 13px; opacity: .75; }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row input {
+    flex: 1 1 260px; height: 46px; padding: 0 14px; font: 14px var(--mono); color: var(--ink);
+    background: var(--surface); border: 1px solid var(--input-border); border-radius: 12px; outline: none;
+  }
+  .row input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent); }
+  .row button {
+    height: 46px; padding: 0 18px; border-radius: 12px; cursor: pointer; font: 600 14px 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: var(--ink); background: transparent; border: 1px solid var(--input-border);
+  }
+  .row button:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+  .foot {
+    margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--ink-4); display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .foot a { color: var(--ink-nav); }
+  .foot a:hover { color: var(--ink); }
+  @media (max-width: 760px) { .wrap { padding: 0 16px 64px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a href="/" class="brand"><i>%</i><span>Mortgage Rate API</span></a>
+    <div class="navlinks">
+      <a href="/#endpoints">Docs</a>
+      <a href="/#pricing" class="go">Get a key</a>
+    </div>
+  </nav>
+
+  {% block content %}{% endblock %}
+
+  <div class="foot">
+    <span>&copy; {{ now_year }} mortgagerateapi.com</span>
+    <a href="/">Home</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/#billing">Manage billing</a>
+    <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a>
+  </div>
+</div>
+</body>
+</html>

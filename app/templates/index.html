@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">API</p>
+<h1 class="title">Mortgage Rate API</h1>
+<p class="updated">
+  {% if latest[30] %}Latest data: week of {{ latest[30].date.strftime("%B %-d, %Y") }}{% else %}Data loading{% endif %}
+</p>
+
+<div class="body">
+
+<p><strong>Weekly US mortgage rates for any date range, as JSON.</strong> Ask for a
+start date and an end date, get back every weekly rate in between. Two endpoints,
+one API key, 30-year and 15-year fixed, back to {{ first.date.year if first else 1971 }}.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Term</th><th>Rate</th><th>Week of</th></tr>
+  {% for term in (30, 15) %}{% if latest[term] %}
+  <tr><td>{{ term }}-year fixed</td><td class="big">{{ "%.2f"|format(latest[term].rate) }}%</td><td>{{ latest[term].date.isoformat() }}</td></tr>
+  {% endif %}{% endfor %}
+</table>
+</div>
+
+<div class="note"><strong>Where the numbers come from.</strong> Freddie Mac's Primary
+Mortgage Market Survey (PMMS), published every Thursday. We pull it from FRED and keep the
+full history, so every answer is the same number the news reports.</div>
+
+<h2>Quickstart</h2>
+
+<p><a href="#pricing">Subscribe</a> to get a key, then export it:</p>
+
+<div class="code"><code>export MORTGAGE_RATE_KEY="mra_..."</code></div>
+
+<h3>Rates over a time period</h3>
+
+<div class="code"><code>curl -s "https://mortgagerateapi.com/v1/rates?term=30&amp;start=2024-01-01&amp;end=2024-03-31" \
+  -H "Authorization: Bearer $MORTGAGE_RATE_KEY"
+
+{"term": 30, "start": "2024-01-01", "end": "2024-03-31",
+ "rates": [{"date": "2024-01-04", "rate": 6.62},
+           {"date": "2024-01-11", "rate": 6.66}, ...],
+ "source": "Freddie Mac Primary Mortgage Market Survey (PMMS), via FRED"}</code></div>
+
+<p>One entry per week, oldest first. Leave out <code>end</code> for today, and
+<code>start</code> for one year before <code>end</code>.</p>
+
+<h3>The latest rates</h3>
+
+<div class="code"><code>curl -s https://mortgagerateapi.com/v1/rates/latest \
+  -H "Authorization: Bearer $MORTGAGE_RATE_KEY"
+
+{"rates": [{"term": 30, "date": "...", "rate": ...},
+           {"term": 15, "date": "...", "rate": ...}], "source": "..."}</code></div>
+
+<h2 id="endpoints">Endpoints</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Method</th><th>Path</th><th>What it does</th></tr>
+  <tr><td>GET</td><td><code>/v1/rates</code></td><td>Weekly rates between <code>start</code> and <code>end</code> for one <code>term</code></td></tr>
+  <tr><td>GET</td><td><code>/v1/rates/latest</code></td><td>This week's 30-year and 15-year rates</td></tr>
+</table>
+</div>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Parameter</th><th>Default</th><th>Meaning</th></tr>
+  <tr><td><code>term</code></td><td><code>30</code></td><td><code>30</code> or <code>15</code> (years, fixed rate)</td></tr>
+  <tr><td><code>start</code></td><td>a year before <code>end</code></td><td>First day of the period, <code>YYYY-MM-DD</code></td></tr>
+  <tr><td><code>end</code></td><td>today</td><td>Last day of the period, <code>YYYY-MM-DD</code></td></tr>
+</table>
+</div>
+
+<h2>Conventions</h2>
+
+<ul>
+  <li><strong>Base URL</strong> is <code>https://mortgagerateapi.com/v1</code>. HTTPS only.</li>
+  <li><strong>Authentication</strong> is <code>Authorization: Bearer &lt;key&gt;</code>. Where you can't set headers (a spreadsheet, say), <code>?api_key=&lt;key&gt;</code> works too.</li>
+  <li><strong>Rates</strong> are annual percentages: <code>6.62</code> means 6.62%.</li>
+  <li><strong>Errors</strong> share one shape, <code>{"error": {"code": "...", "message": "..."}}</code>, with status <code>400</code> for bad input, <code>401</code> for a missing or wrong key, and <code>402</code> when the subscription has lapsed.</li>
+</ul>
+
+</div>
+
+<div class="cta" id="pricing">
+  <h2>One plan. {{ config.PRICE_LABEL }}.</h2>
+  <p>Unlimited requests, full history back to {{ first.date.year if first else 1971 }}, new data every week. Cancel anytime.</p>
+  <form method="post" action="/subscribe"><button type="submit">Subscribe and get your key</button></form>
+  <small>Secure checkout by Stripe. Your key appears the moment you pay.</small>
+</div>
+
+<div class="body" id="billing">
+  <h2>Manage billing</h2>
+  <p>Change your card, download invoices or cancel. Paste your key:</p>
+  {% if request.args.get("billing") == "notfound" %}<div class="note">We couldn't find that key. Check it and try again, or email <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a>.</div>{% endif %}
+  <form method="post" action="/billing" class="row">
+    <input name="api_key" placeholder="mra_..." autocomplete="off" required>
+    <button type="submit">Open billing portal</button>
+  </form>
+</div>
+{% endblock %}

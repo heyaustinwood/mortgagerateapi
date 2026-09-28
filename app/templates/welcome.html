@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Your API key · Mortgage Rate API{% endblock %}
+{% block content %}
+<p class="eyebrow">You're in</p>
+<h1 class="title">Here's your API key</h1>
+<p class="updated">{% if api_key.email %}Subscribed as {{ api_key.email }}{% endif %}</p>
+
+<div class="body">
+<div class="code"><code>{{ api_key.key }}</code></div>
+
+<div class="note"><strong>Save it somewhere safe.</strong> Bookmark this page too: it will
+show the same key again. Lost both? Email <a href="mailto:{{ config.SUPPORT_EMAIL }}">{{ config.SUPPORT_EMAIL }}</a>.</div>
+
+<h2>Try it</h2>
+<div class="code"><code>curl -s "https://mortgagerateapi.com/v1/rates?term=30&amp;start=2024-01-01&amp;end=2024-12-31" \
+  -H "Authorization: Bearer {{ api_key.key }}"</code></div>
+
+<p>Everything else is on the <a href="/#endpoints">docs page</a>.</p>
+</div>
+{% endblock %}
